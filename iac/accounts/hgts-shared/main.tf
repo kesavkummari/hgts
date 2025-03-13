@@ -413,101 +413,47 @@ output "keypair" {
   value = aws_key_pair.hgts_shared_keypair.key_name
 }
 
+resource "aws_acm_certificate" "my_cert" {
+  domain_name       = "hayagreevatechsolutions.in"
+  validation_method = "DNS"
 
-resource "aws_codebuild_project" "codebuild" {
-  name         = "hgts-src"
-  service_role = aws_iam_role.codebuild_role.arn
-  source {
-    type     = "GITHUB"
-    location = var.github_repo_url
-  }
-  environment {
-    compute_type = "BUILD_GENERAL1_SMALL"
-    image        = "aws/codebuild/standard:5.0"
-    type         = "LINUX_CONTAINER"
-  }
-  artifacts {
-    type = "NO_ARTIFACTS"
+  subject_alternative_names = [
+    "www.hayagreevatechsolutions.in"
+  ]
+
+  tags = {
+    Name       = "MyACMCertificate"
+    Created_By = "IaC - Terraform"
   }
 }
 
-resource "aws_iam_role" "codebuild_role" {
-  name = "codebuild-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "codebuild.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
+# Hosted Zone for the Domain (Ensure the domain is registered in AWS Route 53)
+resource "aws_route53_zone" "main_zone" {
+  name = var.domain_name
 }
 
-resource "aws_codepipeline" "pipeline" {
-  name     = "hgts-pipeline"
-  role_arn = aws_iam_role.pipeline_role.arn
-  artifact_store {
-    location = aws_s3_bucket.artifact_bucket.id
-    type     = "S3"
-  }
-
-  stage {
-    name = "Source"
-    action {
-      name             = "SourceAction"
-      category         = "Source"
-      owner            = "ThirdParty"
-      provider         = "GitHub"
-      version          = "1"
-      output_artifacts = ["source_output"]
-      configuration = {
-        Owner      = "kesavkummari"
-        Repo       = var.github_repo_url
-        Branch     = "main"
-        OAuthToken = "your-github-token"
-      }
+# Route 53 Record for ACM Validation
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.my_cert.domain_validation_options : dvo.domain_name => {
+      name  = dvo.resource_record_name
+      type  = dvo.resource_record_type
+      value = dvo.resource_record_value
     }
   }
 
-  stage {
-    name = "Build"
-    action {
-      name             = "BuildAction"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      input_artifacts  = ["source_output"]
-      output_artifacts = ["build_output"]
-      version          = "1"
-      configuration = {
-        ProjectName = aws_codebuild_project.codebuild.name
-      }
-    }
-  }
+  zone_id = aws_route53_zone.main_zone.zone_id
+  name    = each.value.name
+  type    = each.value.type
+  records = [each.value.value]
+  ttl     = 60
 }
 
-resource "aws_s3_bucket" "artifact_bucket" {
-  bucket = "hgts-codepipeline-artifacts"
+
+output "route53_zone_id" {
+  value = aws_route53_zone.main_zone.zone_id
 }
 
-resource "aws_iam_role" "pipeline_role" {
-  name = "codepipeline-role"
-  
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        Service = "codepipeline.amazonaws.com"
-      }
-      Action = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_policy_attachment" "pipeline_policy" {
-  name       = "codepipeline-policy-attach"
-  roles      = [aws_iam_role.pipeline_role.name]
-  policy_arn = "arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess"
-            
+output "certificate_arn" {
+  value = aws_acm_certificate.my_cert.arn
 }

@@ -55,3 +55,6 @@ variable "github_repo_url" {
   default = "https://github.com/Hayagreeva-Tech-Solutions/hgts.git"
 }
 
+variable "domain_name" {
+  default = "hayagreevatechsolutions.in"
+}
