@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Gateway Test</title>
+</head>
+<body>
+    <h2>Test API Gateway</h2>
+    <button onclick="callApi()">Send OTP</button>
+    <p id="response"></p>
+
+    <script>
+        function callApi() {
+            fetch("https://5qfxnv3qrg.execute-api.ap-south-2.amazonaws.com/default/hgts-sendemail-otp", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                },
+                body: JSON.stringify({
+                    email: "arunkumar03jak1@gmail.com",
+                    otp: "234123"
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Network response was not ok");
+                }
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById("response").innerText = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                document.getElementById("response").innerText = "Error: " + error.message;
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,29 +1,56 @@
 variable "hgts_web_vpc_id" {}
 
-variable "hgts_web_private_subnets" { type = list}
+# variable "hgts_web_private_subnets" { type = list}
 
-variable "hgts_web_data_subnets" { type = list}
+# variable "hgts_web_data_subnets" { type = list}
+
+variable "hgts_web_private_subnets" { 
+  type = string
+  }
+
+# variable "hgts_web_data_subnets" { 
+#     type = string
+# }
+
+
+variable "hgts_web_data_subnets" {
+  type        = string
+  description = "Private subnet ID from AZ-1"
+}
+
+variable "hgts_web_data_subnets_2" {
+  type        = string
+  description = "Private subnet ID from AZ-2"
+}
+
 
 variable "ec2_policy_for_ssm" {}
 
 variable "hgts_web_global_source_cidrs" { type = list}
 
-variable "hgts_web_web_ami" {
-  default = "ami-1bf32d64"  //Updated by Chris Hall IIS-image-20180410
+variable "hgts_web_ami" {
+  default = "ami-0ae47cb7b24e2d8ed"  //0
 }
 
 variable "hgts_web_app_ami" {
-  default = "ami-c951acb4"  //Microsoft Windows Server 2012 R2 Base
+  default = "ami-0910dac3efe29f09d"  //Microsoft Windows 2025 Datacenter edition
 }
 
- 
+variable "hgts_web_root_volume_size" {
+  default = 10
+}
+
+variable "hgts_web_instance_size" {
+  default = "t3.micro"
+}
+
 variable "hgts_web_app_c_volume_size" {
-  default = 100
+  default = 50
 }
  
  
 variable "hgts_web_app_instance_size" {
-  default = "c5.xlarge"
+  default = "t3.micro"
 }
 
 variable "hgts_web_key_name" {}
@@ -40,7 +67,7 @@ variable "hgts_web_additional_tags" {
 }
 
 variable "hgts_web_resource_name_prepend" {
-  default = "primavera"
+  default = "hgts"
 }
 
 variable "hgts_web_hosted_zone_id" {
@@ -54,10 +81,9 @@ variable "hgts_web_setup_dns" {
 variable "hgts_web_module_tags" {
   type = map
   default = {
-    "Application"  = "primavera"
-    "ContactEmail" = "vtc.vwts.awsdevsecops.all@veolia.com"
-    "Business"="Water_TS"
-    "Environment"="Prod"
+    "Application"  = "hgts"
+    "ContactEmail" = "support@c3ops.in"
+    "Business"="Cloud"
   }
 }
 
@@ -65,9 +91,9 @@ variable "hgts_web_assign_eip" {
   default = false
 }
 
-variable "hgts_web_admin_windows_sg_id" {}
-
 variable "hgts_web_admin_web_sg_id" {}
+
+variable "hgts_web_admin_windows_sg_id" {}
 
 # RDS Instance Variables
 /////////////////////////////////////////////////////////////////
@@ -104,7 +130,7 @@ variable "rds_snapshot_identifier" {
 
 variable "rds_engine_type" {
   description = "Database engine type"
-  default     = "sqlserver-se"
+  default     = "postgres"
   # Valid types are
   # - mysql
   # - postgres
@@ -117,7 +143,7 @@ variable "rds_engine_type" {
 
 variable "rds_engine_version" {
   description = "Database engine version, depends on engine type"
-  default     = "15.00.4345.5.v1"
+  default     = "17.4"
   # For valid engine versions, see:
   # See http://docs.aws.amazon.com/cli/latest/reference/rds/create-db-instance.html
   # --engine-version
@@ -125,7 +151,7 @@ variable "rds_engine_version" {
 
 variable "rds_instance_class" {
   description = "Class of RDS instance"
-  default     = "db.m5.large"
+  default     = "db.t4g.micro"
   # Valid values
   # https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.html
 }
@@ -136,6 +162,7 @@ variable "rds_instance_class" {
 
 variable "rds_subnet_group" {
   description = "The rds subnet group"
+  default = "hgts-db-subnet"
 }
 
 variable "rds_admin_sg" {
@@ -162,9 +189,10 @@ variable "maintenance_window" {
   default     = "Mon:03:00-Mon:04:00"
 }
 
-//variable "database_name" {
-//  description = "The name of the database to create"
-//}
+variable "database_name" {
+  description = "The name of the database to create"
+  default     = "hgts-web"
+}
 
 //# Self-explainatory variables
 variable "database_user" {}
@@ -177,14 +205,14 @@ variable "database_port" {}
 # We're "cloning" default ones, but we need to specify which should be copied
 variable "db_parameter_group" {
   description = "Parameter group, depends on DB engine used"
-  default = "15.00.4345.5.v1"
+  default = "postgres9.5"
   # default = "mysql5.6"
   # default = "postgres9.5"
 }
 
 variable "publicly_accessible" {
   description = "Determines if database can be publicly available (NOT recommended)"
-  default     = false
+  default     = true 
 }
 
 variable "skip_final_snapshot" {

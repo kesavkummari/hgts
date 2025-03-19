@@ -35,6 +35,12 @@ variable "public_subnets" {
   default     = [] # You can set a default value if needed
 }
 
+variable "data_subnets" {
+  description = "List of Data subnet IDs"
+  type        = list(string)
+  default     = [] # You can set a default value if needed
+}
+
 # variable "public_key" {
 #   default = file("~/.ssh/hgts-shared-preprod.pub")
 # }
