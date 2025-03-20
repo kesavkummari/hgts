@@ -197,13 +197,12 @@
                           body: JSON.stringify(user),
                         });
               const responseData = await response.json();
-              alert(`Response: ${JSON.stringify(responseData)}`);
+              // alert(`Response: ${JSON.stringify(responseData)}`);
               if (!response) {
                 console.log(`Response not ok: ${JSON.stringify(response)}`)
                 //Do something when request fails
                 return;        
               }
-              console.log("before form reset")
               document.getElementById("myForm").reset();
               document.getElementById(
                 "mailMessage"

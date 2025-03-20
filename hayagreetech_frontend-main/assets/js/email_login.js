@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log(password, "registered password")
 
         try {
-            const response = await fetch(`${API_BASE_URL}/email-login-user/`, {
+            const response = await fetch(`${API_BASE_URL}/user/email-login-user`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -21,17 +21,17 @@ document.addEventListener("DOMContentLoaded", function () {
             });
             const responseData = await response.json();
             console.log(responseData,"loginresponsedata"); // For debugging
-
-            if (!response.ok) {
+            if (!responseData){
                 throw new Error(responseData.detail || "Error Login user");
             }
 
             document.getElementById("message").textContent = responseData.message;
-
-            // Simulate form submission processing (redirect after 1 second)
-            setTimeout(() => {
-                window.location.href = "courseviewdashboard.html"; // Redirect to dashboard page after success
-            }, 1000); // Redirect after 1 second
+            if (responseData.status_code==200){
+                // Simulate form submission processing (redirect after 1 second)
+                setTimeout(() => {
+                    window.location.href = "courseviewdashboard.html"; // Redirect to dashboard page after success
+                }, 1000); // Redirect after 1 second
+            }
 
         } catch (error) {
             console.error("Error:", error);
