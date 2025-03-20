@@ -14,7 +14,7 @@ document.getElementById("otp_verificationForm").addEventListener("submit", async
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/verify-otp/`, {
+        const response = await fetch(`${API_BASE_URL}/otp/verify-otp`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, otp }),
@@ -23,7 +23,7 @@ document.getElementById("otp_verificationForm").addEventListener("submit", async
         const responseData = await response.json();
         console.log(responseData, "OTP Verification Response");
 
-        if (response.ok) {
+        if (responseData.status_code==200) {
             messageDiv.style.color = "green";
             messageDiv.textContent = "✅ OTP Verified Successfully! Redirecting...";
             setTimeout(() => {
@@ -49,7 +49,8 @@ document.getElementById("otp_verificationForm").addEventListener("submit", async
 });
 
 // Resend OTP Button
-document.getElementById("resendOtpBtn").addEventListener("click", async function () {
+document.getElementById("resendOtpBtn").addEventListener("click", async function (event) {
+    event.preventDefault();
     const email = localStorage.getItem("email"); 
     const messageDiv = document.getElementById("message");
 
@@ -60,21 +61,21 @@ document.getElementById("resendOtpBtn").addEventListener("click", async function
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/send-otp/`, {
+        const response = await fetch(`${API_BASE_URL}/otp/send-otp`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(email),  // ✅ Fix: Send email as a plain string
+            body: JSON.stringify({email}),  // ✅ Fix: Send email as a plain string
         });
 
         const responseData = await response.json();
         console.log(responseData, "Resend OTP Response");
 
-        if (response.ok) {
+        if (responseData.statusCode==200) {
             messageDiv.style.color = "blue";
             messageDiv.textContent = "✅ OTP Resent Successfully! Check your email.";
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
+            // setTimeout(() => {
+            //     location.reload();
+            // }, 1000);
         } else {
             let errorMessage = "Failed to resend OTP. Try again later.";
 
