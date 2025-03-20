@@ -34,4 +34,5 @@ PORT = 7000  # Change this value to modify the port
 if __name__ == "__main__":
     # Create tables
     Base.metadata.create_all(bind=engine)
-    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
+    # uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
+    uvicorn.run("main:app", host="localhost", port=PORT, reload=True)

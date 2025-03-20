@@ -3,7 +3,7 @@ node_modules/
 package-lock.json
 yarn.lock
 npm-debug.log*
-
+hgts_pyenv
 # Ignore environment files
 .env
 .env.local
