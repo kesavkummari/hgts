@@ -34,7 +34,7 @@ document.getElementById("registerForm").addEventListener("submit", async functio
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/create-user/`, {
+        const response = await fetch(`${API_BASE_URL}/user/create-user`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -54,18 +54,20 @@ document.getElementById("registerForm").addEventListener("submit", async functio
 
         const responseData = await response.json();
 
-        if (!response.ok) {
+        if (!responseData) {
             throw new Error(responseData.detail || "Error creating user");
         } 
         console.log(responseData, "register data");
         localStorage.setItem("email", email);
        
         document.getElementById("message").textContent = responseData.message;
-
-        // Redirect after 1 second
-        setTimeout(() => {
-            window.location.href = "verify_otp.html";
-        }, 1000);
+        
+        if (responseData.statusCode == 200 || responseData.statusCode == 300) {
+            // Redirect after 1 second
+            setTimeout(() => {
+                window.location.href = "verify_otp.html";
+            }, 1000);
+        }
 
     } catch (error) {
         console.error("Error:", error);
