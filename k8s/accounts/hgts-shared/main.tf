@@ -538,6 +538,73 @@ resource "aws_iam_instance_profile" "hgts_k8s_profile" {
   role = aws_iam_role.hgts_k8s_role.name
 }
 
+# resource "aws_instance" "k8s_master" {
+#   ami                         = "ami-0995f69ccfab3ef18" # Ubuntu AMI (Mumbai region example)
+#   instance_type               = "t3.medium"
+#   key_name                    = aws_key_pair.hgts_k8s_keypair.key_name
+#   subnet_id                   = aws_subnet.hgts_k8s_public_subnet_1.id
+#   associate_public_ip_address = true
+#   iam_instance_profile        = aws_iam_instance_profile.hgts_k8s_profile.name
+
+#   user_data = <<-EOF
+#               #!/bin/bash
+#               hostnamectl set-hostname "k8s-cp.cloudbinary.io"
+#               echo "`hostname -I | awk '{ print $1}'` `hostname`" >> /etc/hosts 
+#               sudo apt-get update 
+#               sudo apt-get install git curl unzip tree wget -y 
+#               sudo swapoff -a
+#               sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+#               sudo tee /etc/modules-load.d/containerd.conf <<EOF
+#               overlay
+#               br_netfilter
+#               EOF
+
+#               sudo modprobe overlay
+#               sudo modprobe br_netfilter
+
+#               sudo tee /etc/sysctl.d/kubernetes.conf <<EOF
+#               net.bridge.bridge-nf-call-ip6tables = 1
+#               net.bridge.bridge-nf-call-iptables = 1
+#               net.ipv4.ip_forward = 1
+#               EOF
+#               sudo sysctl --system
+#               sudo apt-get install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+#               sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/docker.gpg
+#               sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+#               sudo apt-get update
+#               sudo apt-get install -y containerd.io
+#               containerd config default | sudo tee /etc/containerd/config.toml >/dev/null 2>&1
+#               sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+#               sudo systemctl restart containerd
+#               sudo systemctl enable containerd
+#               sudo apt-get update
+#               sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+#               curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+#               echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+#               sudo apt-get update
+#               sudo apt-get install -y kubelet kubeadm kubectl
+#               sudo apt-mark hold kubelet kubeadm kubectl
+#               sudo systemctl enable --now kubelet
+#               export KUBECONFIG=/etc/kubernetes/admin.conf
+#               su - ubuntu
+#               id
+#               pwd
+#               cd
+#               sudo kubeadm init --control-plane-endpoint=k8s-cp.cloudbinary.in >> /home/ubuntu/k8s-cluster.output
+#               mkdir -p $HOME/.kube
+#               sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+#               sudo chown $(id -u):$(id -g) $HOME/.kube/config
+#               kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/calico.yaml
+#               kubectl cluster-info
+
+#               EOF
+
+#   tags = {
+#     Name      = "K8s-Master"
+#     CreatedBy = "Terraform"
+#   }
+# }
+
 resource "aws_instance" "k8s_master" {
   ami                         = "ami-0995f69ccfab3ef18" # Ubuntu AMI (Mumbai region example)
   instance_type               = "t3.medium"
@@ -548,32 +615,72 @@ resource "aws_instance" "k8s_master" {
 
   user_data = <<-EOF
               #!/bin/bash
-              apt-get update -y
-              apt-get install -y apt-transport-https ca-certificates curl
+              set -eux  # Enables debugging and stops on errors
               
               # Set Hostname
-              hostnamectl set-hostname "k8s-cp.cloudbinary.in"
+              hostnamectl set-hostname "k8s-cp.cloudbinary.io"
+              echo "$(hostname -I | awk '{print $1}') $(hostname)" >> /etc/hosts 
 
-              # Configure Hostname unto hosts file 
-              echo "`hostname -I | awk '{ print $1}'` `hostname`" >> /etc/hosts 
+              # Install necessary utilities
+              apt-get update 
+              apt-get install -y git curl unzip tree wget 
 
-              # Download, Install & Configure Utility Softwares 
-              sudo apt install git curl unzip tree wget -y 
-
-              # Add Kubernetes repo
-              curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-              echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | tee /etc/apt/sources.list.d/kubernetes.list
-
-              # Install Kubernetes components
-              apt-get update -y
-              apt-get install -y kubelet kubeadm kubectl
-
-              # Disable swap (K8s requirement)
+              # Disable Swap
               swapoff -a
-              sed -i '/ swap / s/^/#/' /etc/fstab
+              sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
 
-              # Enable kubelet service
-              systemctl enable kubelet
+              # Enable required kernel modules
+              cat <<EOF1 | tee /etc/modules-load.d/containerd.conf
+              overlay
+              br_netfilter
+              EOF1
+
+              modprobe overlay
+              modprobe br_netfilter
+
+              # Apply sysctl settings for Kubernetes
+              cat <<EOF2 | tee /etc/sysctl.d/kubernetes.conf
+              net.bridge.bridge-nf-call-ip6tables = 1
+              net.bridge.bridge-nf-call-iptables = 1
+              net.ipv4.ip_forward = 1
+              EOF2
+              sysctl --system
+
+              # Install containerd
+              apt-get install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg
+              add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+              apt-get update
+              apt-get install -y containerd.io
+
+              mkdir -p /etc/containerd
+              containerd config default | tee /etc/containerd/config.toml >/dev/null
+              sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+              systemctl restart containerd
+              systemctl enable containerd
+
+              # Install Kubernetes tools
+              apt-get install -y apt-transport-https ca-certificates curl gpg
+              curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+              echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list
+              apt-get update
+              apt-get install -y kubelet kubeadm kubectl
+              apt-mark hold kubelet kubeadm kubectl
+              systemctl enable --now kubelet
+
+              # Initialize Kubernetes Control Plane
+              kubeadm init --control-plane-endpoint="k8s-cp.cloudbinary.io" | tee /home/ubuntu/k8s-cluster.output
+
+              # Configure kubectl for ubuntu user
+              sudo -u ubuntu mkdir -p /home/ubuntu/.kube
+              sudo cp -i /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+              sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config
+
+              # Install Calico network plugin
+              sudo -u ubuntu kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/calico.yaml
+
+              # Verify cluster status
+              sudo -u ubuntu kubectl cluster-info
               EOF
 
   tags = {
@@ -582,4 +689,76 @@ resource "aws_instance" "k8s_master" {
   }
 }
 
+
+
+
+resource "aws_instance" "k8s_worker_node1" {
+  ami                         = "ami-0995f69ccfab3ef18" # Ubuntu AMI (Hyderabad region example)
+  instance_type               = "t3.medium"
+  key_name                    = aws_key_pair.hgts_k8s_keypair.key_name
+  subnet_id                   = aws_subnet.hgts_k8s_public_subnet_1.id
+  associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.hgts_k8s_profile.name
+
+  user_data = <<-EOF
+              #!/bin/bash
+              set -eux  # Enables debugging and stops on errors
+              
+              # Set Hostname
+              hostnamectl set-hostname "k8s-node1.cloudbinary.io"
+              echo "$(hostname -I | awk '{print $1}') $(hostname)" >> /etc/hosts 
+
+              # Install necessary utilities
+              apt-get update 
+              apt-get install -y git curl unzip tree wget 
+
+              # Disable Swap
+              swapoff -a
+              sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+              # Enable required kernel modules
+              cat <<EOF1 | tee /etc/modules-load.d/containerd.conf
+              overlay
+              br_netfilter
+              EOF1
+
+              modprobe overlay
+              modprobe br_netfilter
+
+              # Apply sysctl settings for Kubernetes
+              cat <<EOF2 | tee /etc/sysctl.d/kubernetes.conf
+              net.bridge.bridge-nf-call-ip6tables = 1
+              net.bridge.bridge-nf-call-iptables = 1
+              net.ipv4.ip_forward = 1
+              EOF2
+              sysctl --system
+
+              # Install containerd
+              apt-get install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg
+              add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+              apt-get update
+              apt-get install -y containerd.io
+
+              mkdir -p /etc/containerd
+              containerd config default | tee /etc/containerd/config.toml >/dev/null
+              sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+              systemctl restart containerd
+              systemctl enable containerd
+
+              # Install Kubernetes tools
+              apt-get install -y apt-transport-https ca-certificates curl gpg
+              curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+              echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list
+              apt-get update
+              apt-get install -y kubelet kubeadm kubectl
+              apt-mark hold kubelet kubeadm kubectl
+              systemctl enable --now kubelet
+              EOF
+
+  tags = {
+    Name      = "K8s-WorkerNode-1"
+    CreatedBy = "Terraform"
+  }
+}
 

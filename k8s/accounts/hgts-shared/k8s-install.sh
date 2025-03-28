@@ -1,99 +1,53 @@
 #!/bin/bash
+set -eux  # Enables debugging and stops on errors
 
-hostnamectl set-hostname "k8s-cp.cloudbinary.io"
-echo "`hostname -I | awk '{ print $1}'` `hostname`" >> /etc/hosts 
-sudo apt-get update 
-sudo apt-get install git curl unzip tree wget -y 
+# Set Hostname
+hostnamectl set-hostname "k8s-node1.cloudbinary.io"
+echo "$(hostname -I | awk '{print $1}') $(hostname)" >> /etc/hosts 
 
-# Load the following kernel modules on all the nodes
-# Disable swap & add kernel settings
+# Install necessary utilities
+apt-get update 
+apt-get install -y git curl unzip tree wget 
 
-sudo swapoff -a
-sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+# Disable Swap
+swapoff -a
+sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
 
-# Load the following kernel modules on all the nodes
-sudo tee /etc/modules-load.d/containerd.conf <<EOF
+# Enable required kernel modules
+cat <<EOF1 | tee /etc/modules-load.d/containerd.conf
 overlay
 br_netfilter
-EOF
+EOF1
 
-sudo modprobe overlay
-sudo modprobe br_netfilter
+modprobe overlay
+modprobe br_netfilter
 
-# Set the following Kernel parameters for Kubernetes, run beneath tee command
-
-sudo tee /etc/sysctl.d/kubernetes.conf <<EOF
+# Apply sysctl settings for Kubernetes
+cat <<EOF2 | tee /etc/sysctl.d/kubernetes.conf
 net.bridge.bridge-nf-call-ip6tables = 1
 net.bridge.bridge-nf-call-iptables = 1
 net.ipv4.ip_forward = 1
-EOF
+EOF2
+sysctl --system
 
-# Reload the above changes, run
-sudo sysctl --system
+# Install containerd
+apt-get install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg
+add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+apt-get update
+apt-get install -y containerd.io
 
-# Install containerd run time
-sudo apt-get install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+mkdir -p /etc/containerd
+containerd config default | tee /etc/containerd/config.toml >/dev/null
+sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+systemctl restart containerd
+systemctl enable containerd
 
-# Enable docker repository
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/docker.gpg
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-
-# Now, run following apt command to install containerd
-sudo apt-get update
-sudo apt-get install -y containerd.io
-
-# Configure containerd so that it starts using systemd as cgroup.
-containerd config default | sudo tee /etc/containerd/config.toml >/dev/null 2>&1
-sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
-
-# Restart and enable containerd service
-sudo systemctl restart containerd
-sudo systemctl enable containerd
-
-# Add apt repository for Kubernetes
-<!-- curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/kubernetes-jammy.gpg
-sudo apt-add-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main" -->
-
-# Update the apt package index and install packages needed to use the Kubernetes apt repository:
-sudo apt-get update
-
-# apt-transport-https may be a dummy package; if so, you can skip that package
-sudo apt-get install -y apt-transport-https ca-certificates curl gpg
-
-# If the directory `/etc/apt/keyrings` does not exist, it should be created before the curl command, read the note below.
-# sudo mkdir -p -m 755 /etc/apt/keyrings
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-
-# https://kubernetes.io/blog/2023/08/15/pkgs-k8s-io-introduction/
-
-# Add the appropriate Kubernetes apt repository.
-echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
-# Install Kubernetes components Kubectl, kubeadm & kubelet
-sudo apt-get update
-sudo apt-get install -y kubelet kubeadm kubectl
-sudo apt-mark hold kubelet kubeadm kubectl
-
-# Enable the kubelet service before running kubeadm:
-sudo systemctl enable --now kubelet
-
-# kubelet --version  Kubernetes v1.28.0 kubeadm version kubectl version
-
-export KUBECONFIG=/etc/kubernetes/admin.conf
-
-# Initialize Kubernetes cluster with Kubeadm command
-su - ubuntu
-id
-pwd
-cd
-sudo kubeadm init --control-plane-endpoint=k8s-cp.cloudbinary.io >> /home/ubuntu/k8s-cluster.output
-
-mkdir -p $HOME/.kube
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-# Install Calico Pod Network Add-on
-# Run following kubectl command to install Calico network plugin from the master node,
-kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/calico.yaml
-
-# kubectl cluster-info
+# Install Kubernetes tools
+apt-get install -y apt-transport-https ca-certificates curl gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list
+apt-get update
+apt-get install -y kubelet kubeadm kubectl
+apt-mark hold kubelet kubeadm kubectl
+systemctl enable --now kubelet
